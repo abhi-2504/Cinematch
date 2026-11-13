@@ -1,5 +1,7 @@
 # cinematch
 
+Movie Recommendation App using Flutter and FastAPI
+
 A new Flutter project.
 
 ## Getting Started
