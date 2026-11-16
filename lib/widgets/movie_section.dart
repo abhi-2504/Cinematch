@@ -352,7 +352,7 @@ class MovieSectionState extends State<MovieSection>
                 physics: const ClampingScrollPhysics(),
                 itemCount:
                 _movies.length + (_hasMore ? 1 : 0),
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                 const SizedBox(width: 14),
                 itemBuilder: (context, index) {
                   if (index >= _movies.length) {

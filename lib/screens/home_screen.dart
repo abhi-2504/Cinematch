@@ -556,7 +556,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             keyboardDismissBehavior:
             ScrollViewKeyboardDismissBehavior.onDrag,
-            cacheExtent: 300,
+            cacheExtent: 100,
             itemCount: 5,
             itemBuilder: (context, index) {
               if (index == 0) {
