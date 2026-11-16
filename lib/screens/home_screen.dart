@@ -560,7 +560,26 @@ class _HomeScreenState extends State<HomeScreen> {
             itemCount: 5,
             itemBuilder: (context, index) {
               if (index == 0) {
-                return buildCategorySection();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Semantics(
+                      header: true,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                        child: Text(
+                          'Discover Movies with CineMatch',
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    buildCategorySection(),
+                  ],
+                );
               }
 
               return buildMovieSection(index);

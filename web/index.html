@@ -1,67 +1,76 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
 
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
+  <!-- SEO Title -->
+  <title>CineMatch - Discover Movies, Ratings & Recommendations</title>
 
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+  <!-- SEO Description -->
+  <meta name="description"
+        content="Discover trending movies, explore genres, search movies, view ratings and trailers, and find your next favourite film with CineMatch.">
 
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <link rel="canonical" href="https://cinematch-2504.web.app/" />
-  <title>CineMatch - Discover Movies</title>
+  <!-- Search Engine Instructions -->
+  <meta name="robots" content="index, follow">
+
+  <!-- Canonical URL: Only one -->
+  <link rel="canonical"
+        href="https://cinematch-2504.web.app/">
+
+  <!-- Google Search Console Verification -->
+  <meta name="google-site-verification"
+        content="QsWGM_Xkww1QHNO6Tdw39P7lg30JT9a8n7tP57mKrCI">
+
   <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script async
+          src="https://www.googletagmanager.com/gtag/js?id=G-S26B7W9MYN">
+  </script>
 
   <script>
     window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
 
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
     gtag('config', 'G-S26B7W9MYN');
   </script>
-  <meta name="description"
-        content="Discover trending movies, explore genres,
-search movies and find your next favourite film with CineMatch.">
 
-  <meta name="robots" content="index, follow">
-
-  <link rel="canonical"
-        href="https://cinematch-2504.web.app/">
+  <!-- Flutter Base URL -->
   <base href="$FLUTTER_BASE_HREF">
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-  <meta name="google-site-verification" content="QsWGM_Xkww1QHNO6Tdw39P7lg30JT9a8n7tP57mKrCI" />
-
-  <!-- iOS meta tags & icons -->
+  <!-- iOS and Mobile Settings -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="cinematch">
+  <meta name="apple-mobile-web-app-title" content="CineMatch">
+
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon.png">
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>cinematch</title>
+  <!-- Web App Manifest -->
   <link rel="manifest" href="manifest.json">
 </head>
-<body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
+
+<body>
+
+<!-- Main SEO Heading -->
+<h1 style="
+    font-size: 26px;
+    font-weight: bold;
+    margin: 16px;
+    text-align: center;
+  ">
+  CineMatch - Discover Movies, Ratings & Recommendations
+</h1>
+
+<!-- Flutter Application -->
+<script src="flutter_bootstrap.js" async></script>
+
 </body>
+
 </html>
