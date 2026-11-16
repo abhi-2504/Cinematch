@@ -19,7 +19,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> genres = [];
-
+  int _searchRequestId = 0;
   bool _genresLoading = true;
   String? _genreError;
 
@@ -157,22 +157,38 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Smart search suggestions.
+
   Future<Iterable<Movie>> getSuggestions(String input) async {
     final query = input.trim();
 
     if (query.isEmpty) {
+      _searchRequestId++;
       return [];
     }
 
+    // Identify the latest search request.
+    final requestId = ++_searchRequestId;
+
+    // Wait before sending the API request.
     await Future.delayed(
-      const Duration(milliseconds: 400),
+      const Duration(milliseconds: 500),
     );
+
+    // Ignore older requests if the user typed another character.
+    if (requestId != _searchRequestId) {
+      return [];
+    }
 
     try {
       final result = await ApiService.searchMoviesPage(
         query,
         page: 1,
       );
+
+      // Ignore outdated responses.
+      if (requestId != _searchRequestId) {
+        return [];
+      }
 
       final suggestions = result['movies'] as List<Movie>;
 
@@ -182,6 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return [];
     }
   }
+
 
   Widget buildSmartSearch(double screenWidth) {
     return Autocomplete<Movie>(

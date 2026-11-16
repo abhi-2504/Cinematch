@@ -8,11 +8,21 @@ import 'screens/home_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
+  // Show the Flutter application immediately.
   runApp(const CineMatchApp());
+
+  // Initialize Firebase in the background.
+  // The initial UI does not need to wait for this operation.
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    debugPrint('Firebase initialized successfully.');
+  } catch (error, stackTrace) {
+    debugPrint('Firebase initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
 }
 
 class CineMatchApp extends StatelessWidget {
@@ -41,7 +51,6 @@ class CineMatchApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
-      // Direct Home Page. No login required.
       home: const HomeScreen(),
     );
   }

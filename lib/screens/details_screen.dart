@@ -1,12 +1,15 @@
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+
 import '../models/movie.dart';
 import '../services/api_service.dart';
-import '../widgets/movie_card.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/watchlist_service.dart';
+import '../widgets/movie_card.dart';
 
 class DetailsScreen extends StatefulWidget {
   final Movie movie;
@@ -17,12 +20,12 @@ class DetailsScreen extends StatefulWidget {
   });
 
   @override
-  State<DetailsScreen> createState() =>
-      _DetailsScreenState();
+  State<DetailsScreen> createState() => _DetailsScreenState();
 }
 
 class _DetailsScreenState extends State<DetailsScreen> {
   Movie? details;
+
   List<Movie> recommendations = [];
   List<Movie> similar = [];
   List<String> cast = [];
@@ -30,6 +33,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
   bool loading = true;
   String? trailerKey;
   bool showTrailer = false;
+
   YoutubePlayerController? trailerController;
 
   @override
@@ -37,6 +41,115 @@ class _DetailsScreenState extends State<DetailsScreen> {
     super.initState();
     loadDetails();
   }
+
+  // Load main movie details first.
+  Future<void> loadDetails() async {
+    try {
+      final movieDetails =
+      await ApiService.getDetails(widget.movie.id);
+
+      if (!mounted) return;
+
+      // Display movie immediately.
+      setState(() {
+        details = movieDetails;
+        loading = false;
+      });
+
+      // Load remaining information in background.
+      unawaited(loadRecommendations());
+      unawaited(loadSimilar());
+      unawaited(loadCredits());
+      unawaited(loadTrailer());
+
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not load movie details: $error'),
+        ),
+      );
+    }
+  }
+
+  // Load recommended movies separately.
+  Future<void> loadRecommendations() async {
+    try {
+      final result =
+      await ApiService.getRecommendations(widget.movie.id);
+
+      if (!mounted) return;
+
+      setState(() {
+        recommendations = result;
+      });
+    } catch (e) {
+      debugPrint('Recommendations loading failed: $e');
+    }
+  }
+
+  // Load similar movies separately.
+  Future<void> loadSimilar() async {
+    try {
+      final result =
+      await ApiService.getSimilar(widget.movie.id);
+
+      if (!mounted) return;
+
+      setState(() {
+        similar = result;
+      });
+    } catch (e) {
+      debugPrint('Similar movies loading failed: $e');
+    }
+  }
+
+  // Load cast information separately.
+  Future<void> loadCredits() async {
+    try {
+      final creditData =
+      await ApiService.getCredits(widget.movie.id);
+
+      final castData = creditData['cast'] as List? ?? [];
+
+      final castNames = castData
+          .take(10)
+          .map((person) => person['name'].toString())
+          .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        cast = castNames;
+      });
+    } catch (e) {
+      debugPrint('Cast loading failed: $e');
+    }
+  }
+
+  // Load trailer separately.
+  Future<void> loadTrailer() async {
+    try {
+      final trailerData =
+      await ApiService.getTrailer(widget.movie.id);
+
+      if (!mounted) return;
+
+      if (trailerData['available'] == true) {
+        setState(() {
+          trailerKey = trailerData['youtube_key'] as String?;
+        });
+      }
+    } catch (e) {
+      debugPrint('Trailer loading failed: $e');
+    }
+  }
+
   void playTrailer() {
     if (trailerKey == null) return;
 
@@ -57,11 +170,6 @@ class _DetailsScreenState extends State<DetailsScreen> {
     });
   }
 
-  @override
-  void dispose() {
-    trailerController?.close();
-    super.dispose();
-  }
   Future<void> addToWatchlist() async {
     try {
       final added = await WatchlistService.instance.addMovie(
@@ -89,60 +197,11 @@ class _DetailsScreenState extends State<DetailsScreen> {
       );
     }
   }
-  Future<void> loadDetails() async {
-    try {
-      final results = await Future.wait([
-        ApiService.getDetails(widget.movie.id),
-        ApiService.getRecommendations(widget.movie.id),
-        ApiService.getSimilar(widget.movie.id),
-        ApiService.getCredits(widget.movie.id),
-      ]);
-
-      final creditData =
-      results[3] as Map<String, dynamic>;
-
-      final castData = creditData['cast'] as List? ?? [];
-
-      if (!mounted) return;
-      String? fetchedTrailerKey;
-
-      try {
-        final trailerData = await ApiService.getTrailer(widget.movie.id);
-
-        if (trailerData['available'] == true) {
-          fetchedTrailerKey = trailerData['youtube_key'] as String?;
-        }
-      } catch (e) {
-        debugPrint('Trailer loading failed: $e');
-      }
-      setState(() {
-        details = results[0] as Movie;
-        recommendations = results[1] as List<Movie>;
-        similar = results[2] as List<Movie>;
-        trailerKey = fetchedTrailerKey;
-
-        cast = castData
-            .take(10)
-            .map((person) => person['name'].toString())
-            .toList();
-
-        loading = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-
-      setState(() {
-        loading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not load details: $error')),
-      );
-    }
-  }
 
   Widget movieRow(String title, List<Movie> movies) {
-    if (movies.isEmpty) return const SizedBox.shrink();
+    if (movies.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,9 +219,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
         SizedBox(
           height: 275,
           child: ListView.separated(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
             itemCount: movies.length,
             separatorBuilder: (_, _) =>
@@ -176,8 +233,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          DetailsScreen(movie: item),
+                      builder: (_) => DetailsScreen(movie: item),
                     ),
                   );
                 },
@@ -188,6 +244,13 @@ class _DetailsScreenState extends State<DetailsScreen> {
       ],
     );
   }
+
+  @override
+  void dispose() {
+    trailerController?.close();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final movie = details ?? widget.movie;
@@ -202,15 +265,14 @@ class _DetailsScreenState extends State<DetailsScreen> {
       )
           : ListView(
         children: [
-
-
           if (movie.backdropUrl != null)
             Container(
               width: double.infinity,
               color: Colors.black,
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: showTrailer && trailerController != null
+                child: showTrailer &&
+                    trailerController != null
                     ? YoutubePlayer(
                   controller: trailerController!,
                   aspectRatio: 16 / 9,
@@ -223,13 +285,14 @@ class _DetailsScreenState extends State<DetailsScreen> {
                       imageUrl: movie.backdropUrl!,
                       width: double.infinity,
                       fit: BoxFit.contain,
-                      alignment: Alignment.center,
                       placeholder: (context, url) {
                         return const Center(
-                          child: CircularProgressIndicator(),
+                          child:
+                          CircularProgressIndicator(),
                         );
                       },
-                      errorWidget: (context, url, error) {
+                      errorWidget:
+                          (context, url, error) {
                         return const Icon(
                           Icons.broken_image,
                           size: 50,
@@ -237,7 +300,6 @@ class _DetailsScreenState extends State<DetailsScreen> {
                         );
                       },
                     ),
-
                     if (trailerKey != null)
                       Center(
                         child: ElevatedButton.icon(
@@ -252,10 +314,15 @@ class _DetailsScreenState extends State<DetailsScreen> {
                               fontSize: 16,
                             ),
                           ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.redAccent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
+                          style:
+                          ElevatedButton.styleFrom(
+                            backgroundColor:
+                            Colors.redAccent,
+                            foregroundColor:
+                            Colors.white,
+                            padding:
+                            const EdgeInsets
+                                .symmetric(
                               horizontal: 22,
                               vertical: 14,
                             ),
@@ -266,6 +333,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
                 ),
               ),
             ),
+
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -280,9 +348,11 @@ class _DetailsScreenState extends State<DetailsScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
+
                 Text(
                   '${movie.releaseYear}  •  TMDB rating: ${movie.rating.toStringAsFixed(1)}/10',
                 ),
+
                 const SizedBox(height: 12),
 
                 ElevatedButton.icon(
@@ -290,7 +360,9 @@ class _DetailsScreenState extends State<DetailsScreen> {
                   icon: const Icon(Icons.bookmark_add),
                   label: const Text('Add to Watchlist'),
                 ),
+
                 const SizedBox(height: 15),
+
                 const Text(
                   'Overview',
                   style: TextStyle(
@@ -298,13 +370,17 @@ class _DetailsScreenState extends State<DetailsScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const SizedBox(height: 8),
+
                 Text(
                   movie.overview.isEmpty
                       ? 'No overview available.'
                       : movie.overview,
                 ),
+
                 const SizedBox(height: 20),
+
                 const Text(
                   'Cast',
                   style: TextStyle(
@@ -312,13 +388,17 @@ class _DetailsScreenState extends State<DetailsScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const SizedBox(height: 8),
+
                 Text(
                   cast.isEmpty
-                      ? 'Cast information unavailable.'
+                      ? 'Loading cast information...'
                       : cast.join(' • '),
                 ),
+
                 const SizedBox(height: 20),
+
                 if (movie.imdbUrl != null)
                   OutlinedButton.icon(
                     onPressed: () {
@@ -359,5 +439,4 @@ class _DetailsScreenState extends State<DetailsScreen> {
       ),
     );
   }
-
 }
