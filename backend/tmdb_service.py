@@ -35,14 +35,15 @@ logger = logging.getLogger(__name__)
 session = requests.Session()
 
 retry_strategy = Retry(
-    total=3,
-    connect=3,
-    read=3,
-    status=3,
-    backoff_factor=1,
+    total=1,
+    connect=1,
+    read=1,
+    status=1,
+    backoff_factor=0.3,
     status_forcelist=[429, 500, 502, 503, 504],
     allowed_methods=["GET"],
-    respect_retry_after_header=True
+    respect_retry_after_header=True,
+    raise_on_status=False,
 )
 
 adapter = HTTPAdapter(max_retries=retry_strategy)
@@ -55,7 +56,7 @@ CACHE = OrderedDict()
 CACHE_LOCK = threading.Lock()
 
 CACHE_TTL = 300
-CACHE_MAX_SIZE = 200
+CACHE_MAX_SIZE = 300
 
 
 def get_cache_key(endpoint, params):
@@ -67,8 +68,8 @@ def get_cache_key(endpoint, params):
     )
 
 
-def tmdb_request(endpoint, params=None):
 
+def tmdb_request(endpoint, params=None):
     params = params or {}
     cache_key = get_cache_key(endpoint, params)
 
@@ -76,7 +77,7 @@ def tmdb_request(endpoint, params=None):
     with CACHE_LOCK:
         cached = CACHE.get(cache_key)
 
-        if cached:
+        if cached is not None:
             data, expiry = cached
 
             if time.time() < expiry:
@@ -94,11 +95,10 @@ def tmdb_request(endpoint, params=None):
             url,
             headers=HEADERS,
             params=params,
-            timeout=(5, 20)
+            timeout=(4, 15)
         )
 
         response.raise_for_status()
-
         data = response.json()
 
         # Store successful response in cache
@@ -115,18 +115,12 @@ def tmdb_request(endpoint, params=None):
 
         return data
 
-    except requests.HTTPError as error:
-        status = error.response.status_code if error.response is not None else 500
-
-        logger.error(
-            "TMDB HTTP error %s: %s",
-            status,
-            endpoint
-        )
+    except requests.HTTPError:
+        logger.exception("TMDB HTTP error: %s", endpoint)
         raise
 
     except requests.Timeout:
-        logger.error("TMDB request timed out: %s", endpoint)
+        logger.exception("TMDB request timed out: %s", endpoint)
         raise
 
     except requests.RequestException:
@@ -136,6 +130,7 @@ def tmdb_request(endpoint, params=None):
     except ValueError:
         logger.exception("Invalid JSON response from TMDB")
         raise
+
 
 
 def format_movie(movie):

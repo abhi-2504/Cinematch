@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -26,9 +25,9 @@ class MovieSection extends StatefulWidget {
 
 class MovieSectionState extends State<MovieSection>
     with AutomaticKeepAliveClientMixin<MovieSection> {
-
   @override
   bool get wantKeepAlive => true;
+
   final ScrollController _rowController = ScrollController();
   final FocusNode _rowFocusNode = FocusNode();
 
@@ -40,8 +39,10 @@ class MovieSectionState extends State<MovieSection>
 
   int _currentPage = 0;
   int _totalPages = 1;
+  int _requestGeneration = 0;
 
   bool _initialLoading = true;
+  bool _initialRequestRunning = false;
   bool _loadingMore = false;
   bool _hasError = false;
 
@@ -55,18 +56,27 @@ class MovieSectionState extends State<MovieSection>
     super.initState();
 
     _rowController.addListener(_onScroll);
+
     _loadInitialPage();
   }
 
   @override
   void dispose() {
+    _requestGeneration++;
+
     _rowController.removeListener(_onScroll);
     _rowController.dispose();
+
     _rowFocusNode.dispose();
+
     super.dispose();
   }
 
+  // Refresh the movie section.
   Future<void> refresh() async {
+    // Invalidate all previous requests.
+    _requestGeneration++;
+
     if (_rowController.hasClients) {
       _rowController.jumpTo(0);
     }
@@ -81,7 +91,9 @@ class MovieSectionState extends State<MovieSection>
       _totalPages = 1;
 
       _initialLoading = true;
+      _initialRequestRunning = false;
       _loadingMore = false;
+
       _hasError = false;
 
       _errorMessage = null;
@@ -91,11 +103,16 @@ class MovieSectionState extends State<MovieSection>
     await _loadInitialPage();
   }
 
+  // Load the first page.
   Future<void> _loadInitialPage() async {
-    if (!mounted) return;
+    if (!mounted || _initialRequestRunning) return;
+
+    final requestId = ++_requestGeneration;
 
     setState(() {
       _initialLoading = true;
+      _initialRequestRunning = true;
+
       _hasError = false;
       _errorMessage = null;
     });
@@ -103,7 +120,8 @@ class MovieSectionState extends State<MovieSection>
     try {
       final result = await widget.loadPage(1);
 
-      if (!mounted) return;
+      // Ignore outdated responses.
+      if (!mounted || requestId != _requestGeneration) return;
 
       setState(() {
         _movies
@@ -118,21 +136,37 @@ class MovieSectionState extends State<MovieSection>
         _totalPages = result.totalPages;
 
         _initialLoading = false;
+        _initialRequestRunning = false;
+
         _hasError = false;
+        _errorMessage = null;
+      });
+
+      // Check if more pages should be loaded.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _onScroll();
+        }
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _requestGeneration) return;
 
       setState(() {
         _initialLoading = false;
+        _initialRequestRunning = false;
+
         _hasError = true;
-        _errorMessage = e.toString();
+        _errorMessage = 'Unable to load movies. Please try again.';
       });
+
+      debugPrint('${widget.title} initial loading failed: $e');
     }
   }
 
+  // Detect horizontal scroll position.
   void _onScroll() {
-    if (!_rowController.hasClients ||
+    if (!mounted ||
+        !_rowController.hasClients ||
         _initialLoading ||
         _loadingMore ||
         !_hasMore ||
@@ -145,15 +179,14 @@ class MovieSectionState extends State<MovieSection>
     }
   }
 
+  // Load the next page.
   Future<void> _loadNextPage() async {
-    if (!mounted ||
-        _loadingMore ||
-        _initialLoading ||
-        !_hasMore) {
+    if (!mounted || _loadingMore || _initialLoading || !_hasMore) {
       return;
     }
 
     final nextPage = _currentPage + 1;
+    final requestId = _requestGeneration;
 
     setState(() {
       _loadingMore = true;
@@ -163,7 +196,8 @@ class MovieSectionState extends State<MovieSection>
     try {
       final result = await widget.loadPage(nextPage);
 
-      if (!mounted) return;
+      // Ignore response if refresh happened meanwhile.
+      if (!mounted || requestId != _requestGeneration) return;
 
       setState(() {
         for (final movie in result.movies) {
@@ -179,27 +213,27 @@ class MovieSectionState extends State<MovieSection>
         _loadMoreError = null;
       });
 
-      // If the new page has very few movies, continue loading
-      // only when the row is still close to its end.
+      // Continue pagination if row is still near the end.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _onScroll();
+        if (mounted) {
+          _onScroll();
+        }
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _requestGeneration) return;
 
       setState(() {
         _loadingMore = false;
-        _loadMoreError = e.toString();
+        _loadMoreError = 'Unable to load more movies';
       });
+
+      debugPrint('${widget.title} next page failed: $e');
     }
   }
 
-  KeyEventResult _handleRowKeyboard(
-      FocusNode node,
-      KeyEvent event,
-      ) {
-    if (event is! KeyDownEvent ||
-        !_rowController.hasClients) {
+  // Keyboard horizontal scrolling.
+  KeyEventResult _handleRowKeyboard(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent || !_rowController.hasClients) {
       return KeyEventResult.ignored;
     }
 
@@ -217,10 +251,7 @@ class MovieSectionState extends State<MovieSection>
 
     final position = _rowController.position;
 
-    target = target.clamp(
-      position.minScrollExtent,
-      position.maxScrollExtent,
-    );
+    target = target.clamp(position.minScrollExtent, position.maxScrollExtent);
 
     _rowController.animateTo(
       target,
@@ -231,6 +262,7 @@ class MovieSectionState extends State<MovieSection>
     return KeyEventResult.handled;
   }
 
+  // Initial loading error UI.
   Widget _buildInitialError() {
     return SizedBox(
       height: 150,
@@ -238,20 +270,13 @@ class MovieSectionState extends State<MovieSection>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.wifi_off,
-              color: Colors.white54,
-              size: 28,
-            ),
+            const Icon(Icons.wifi_off, color: Colors.white54, size: 28),
             const SizedBox(height: 8),
             Text(
               _errorMessage ?? 'Unable to load movies',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
             const SizedBox(height: 8),
             TextButton.icon(
@@ -265,6 +290,7 @@ class MovieSectionState extends State<MovieSection>
     );
   }
 
+  // Pagination loading indicator.
   Widget _buildLoadMoreIndicator() {
     if (_loadMoreError != null) {
       return SizedBox(
@@ -273,11 +299,7 @@ class MovieSectionState extends State<MovieSection>
           child: IconButton(
             tooltip: 'Retry loading movies',
             onPressed: _loadNextPage,
-            icon: const Icon(
-              Icons.refresh,
-              color: Colors.redAccent,
-              size: 30,
-            ),
+            icon: const Icon(Icons.refresh, color: Colors.redAccent, size: 30),
           ),
         ),
       );
@@ -290,9 +312,7 @@ class MovieSectionState extends State<MovieSection>
           child: SizedBox(
             width: 25,
             height: 25,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.5,
-            ),
+            child: CircularProgressIndicator(strokeWidth: 2.5),
           ),
         ),
       );
@@ -304,74 +324,63 @@ class MovieSectionState extends State<MovieSection>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Section title.
         Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Text(
             widget.title,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
         ),
 
+        // Movie list.
         SizedBox(
           height: 275,
           child: _initialLoading
-              ? const Center(
-            child: CircularProgressIndicator(),
-          )
+              ? const Center(child: CircularProgressIndicator())
               : _hasError
               ? _buildInitialError()
               : _movies.isEmpty
-              ? const Center(
-            child: Text('No movies available'),
-          )
+              ? const Center(child: Text('No movies available'))
               : MouseRegion(
-            onEnter: (_) {
-              _rowFocusNode.requestFocus();
-            },
-            child: Focus(
-              focusNode: _rowFocusNode,
-              onKeyEvent: _handleRowKeyboard,
-              child: ListView.separated(
-                key: PageStorageKey<String>(
-                  'movie-section-${widget.title}',
-                ),
-                controller: _rowController,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                ),
-                scrollDirection: Axis.horizontal,
-                physics: const ClampingScrollPhysics(),
-                itemCount:
-                _movies.length + (_hasMore ? 1 : 0),
-                separatorBuilder: (_, _) =>
-                const SizedBox(width: 14),
-                itemBuilder: (context, index) {
-                  if (index >= _movies.length) {
-                    return _buildLoadMoreIndicator();
-                  }
+                  onEnter: (_) {
+                    _rowFocusNode.requestFocus();
+                  },
+                  child: Focus(
+                    focusNode: _rowFocusNode,
+                    onKeyEvent: _handleRowKeyboard,
+                    child: ListView.separated(
+                      key: PageStorageKey<String>(
+                        'movie-section-${widget.title}',
+                      ),
+                      controller: _rowController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
+                      itemCount: _movies.length + (_hasMore ? 1 : 0),
+                      separatorBuilder: (_, _) => const SizedBox(width: 14),
+                      itemBuilder: (context, index) {
+                        if (index >= _movies.length) {
+                          return _buildLoadMoreIndicator();
+                        }
 
-                  final movie = _movies[index];
+                        final movie = _movies[index];
 
-                  return MovieCard(
-                    key: ValueKey(movie.id),
-                    movie: movie,
-                    onTap: () {
-                      widget.onMovieTap(movie);
-                    },
-                  );
-                },
-              ),
-            ),
-          ),
+                        return MovieCard(
+                          key: ValueKey(movie.id),
+                          movie: movie,
+                          onTap: () {
+                            widget.onMovieTap(movie);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
         ),
       ],
     );

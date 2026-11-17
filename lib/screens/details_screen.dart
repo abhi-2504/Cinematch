@@ -39,10 +39,15 @@ class _DetailsScreenState extends State<DetailsScreen> {
   @override
   void initState() {
     super.initState();
-    loadDetails();
+
+
+    details = widget.movie;
+    loading = false;
+
+
+    unawaited(loadDetails());
   }
 
-  // Load main movie details first.
   Future<void> loadDetails() async {
     try {
       final movieDetails =
@@ -50,18 +55,10 @@ class _DetailsScreenState extends State<DetailsScreen> {
 
       if (!mounted) return;
 
-      // Display movie immediately.
       setState(() {
         details = movieDetails;
         loading = false;
       });
-
-      // Load remaining information in background.
-      unawaited(loadRecommendations());
-      unawaited(loadSimilar());
-      unawaited(loadCredits());
-      unawaited(loadTrailer());
-
     } catch (error) {
       if (!mounted) return;
 
@@ -69,12 +66,16 @@ class _DetailsScreenState extends State<DetailsScreen> {
         loading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not load movie details: $error'),
-        ),
-      );
+      debugPrint('Movie details loading failed: $error');
     }
+
+    // Main details fail aina, other sections independent ga load avvali.
+    if (!mounted) return;
+
+    unawaited(loadRecommendations());
+    unawaited(loadSimilar());
+    unawaited(loadCredits());
+    unawaited(loadTrailer());
   }
 
   // Load recommended movies separately.
@@ -259,11 +260,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
       appBar: AppBar(
         title: const Text('Movie Details'),
       ),
-      body: loading
-          ? const Center(
-        child: CircularProgressIndicator(),
-      )
-          : ListView(
+      body: ListView(
         children: [
           if (movie.backdropUrl != null)
             Container(
